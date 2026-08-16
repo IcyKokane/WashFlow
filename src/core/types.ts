@@ -53,6 +53,21 @@ export interface Estimate {
   subtotal: number
   status: EstimateStatus
   createdAt: string
+  acceptedAt?: string
+}
+
+export type JobStatus = 'unscheduled' | 'scheduled' | 'in_progress' | 'completed'
+
+export interface Job {
+  id: Id
+  estimateId: Id
+  customerId: Id
+  propertyId: Id
+  items: EstimateItem[]
+  quotedTotal: number
+  status: JobStatus
+  scheduledFor?: string
+  createdAt: string
 }
 
 export interface ServiceTemplate {
@@ -67,5 +82,6 @@ export interface ServiceCoreData {
   properties: Property[]
   leads: Lead[]
   estimates: Estimate[]
+  jobs: Job[]
   serviceTemplates: ServiceTemplate[]
 }
