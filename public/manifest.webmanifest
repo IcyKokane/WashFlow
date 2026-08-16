@@ -1,0 +1,11 @@
+{
+  "name": "WashFlow",
+  "short_name": "WashFlow",
+  "description": "Local-first quote-to-paid workflow for pressure washing businesses.",
+  "start_url": "/WashFlow/",
+  "scope": "/WashFlow/",
+  "display": "standalone",
+  "background_color": "#eef4f8",
+  "theme_color": "#117eb4",
+  "icons": []
+}
