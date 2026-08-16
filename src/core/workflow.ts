@@ -1,4 +1,4 @@
-import type { Estimate, EstimateItem, Job, PricingMode } from './types'
+import type { Estimate, EstimateItem, Invoice, Job, PricingMode } from './types'
 import { newId } from './storage'
 
 export function calculateLineTotal(quantity: number, unitPrice: number): number {
@@ -37,5 +37,22 @@ export function createJobFromEstimate(estimate: Estimate): Job {
     quotedTotal: estimate.subtotal,
     status: 'unscheduled',
     createdAt: new Date().toISOString()
+  }
+}
+
+export function createInvoiceFromJob(job: Job, dueInDays = 7): Invoice {
+  const now = new Date()
+  const due = new Date(now)
+  due.setDate(due.getDate() + dueInDays)
+  return {
+    id: newId('invoice'),
+    jobId: job.id,
+    customerId: job.customerId,
+    propertyId: job.propertyId,
+    items: structuredClone(job.items),
+    total: job.quotedTotal,
+    status: 'unpaid',
+    dueDate: due.toISOString().slice(0, 10),
+    createdAt: now.toISOString()
   }
 }
