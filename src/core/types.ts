@@ -53,6 +53,7 @@ export interface Estimate {
   subtotal: number
   status: EstimateStatus
   createdAt: string
+  sentAt?: string
   acceptedAt?: string
 }
 
@@ -83,6 +84,21 @@ export interface Job {
   createdAt: string
 }
 
+export type InvoiceStatus = 'unpaid' | 'paid'
+
+export interface Invoice {
+  id: Id
+  jobId: Id
+  customerId: Id
+  propertyId: Id
+  items: EstimateItem[]
+  total: number
+  status: InvoiceStatus
+  dueDate: string
+  createdAt: string
+  paidAt?: string
+}
+
 export interface ServiceTemplate {
   id: Id
   name: string
@@ -97,5 +113,6 @@ export interface ServiceCoreData {
   estimates: Estimate[]
   jobs: Job[]
   jobPhotos: JobPhoto[]
+  invoices: Invoice[]
   serviceTemplates: ServiceTemplate[]
 }
