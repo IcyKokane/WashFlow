@@ -4,10 +4,12 @@ import { loadData, newId, saveData } from './core/storage'
 import { buildEstimateItem, createInvoiceFromJob, createJobFromEstimate, estimateSubtotal } from './core/workflow'
 import { getNeedsAttention } from './core/attention'
 import { compressPhoto } from './core/photos'
+import { createBackup, customersCsv, downloadText, invoicesCsv, parseBackup } from './core/backup'
 import { pressureWashingServices } from './washflow/defaults'
+import { createDemoData } from './washflow/demo'
 import './styles.css'
 
-type View = 'home' | 'customer' | 'lead' | 'estimate' | 'estimateDetail' | 'jobs' | 'jobDetail' | 'money'
+type View = 'home' | 'customer' | 'customers' | 'lead' | 'estimate' | 'estimateDetail' | 'jobs' | 'jobDetail' | 'money' | 'data'
 
 const initialData: ServiceCoreData = {
   customers: [], properties: [], leads: [], estimates: [], jobs: [], jobPhotos: [], invoices: [], serviceTemplates: pressureWashingServices
@@ -23,6 +25,7 @@ export default function App() {
   const [selectedEstimateId, setSelectedEstimateId] = useState('')
   const [selectedJobId, setSelectedJobId] = useState('')
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [dataNotice, setDataNotice] = useState('')
 
   useEffect(() => {
     loadData().then((stored) => {
@@ -30,8 +33,8 @@ export default function App() {
       setReady(true)
     }).catch(() => setReady(true))
   }, [])
-
   useEffect(() => { if (ready) void saveData(data) }, [data, ready])
+
   const latestEstimate = useMemo(() => data.estimates.at(-1), [data.estimates])
   const attention = useMemo(() => getNeedsAttention(data), [data])
   const outstanding = useMemo(() => data.invoices.filter((item) => item.status === 'unpaid').reduce((sum, item) => sum + item.total, 0), [data.invoices])
@@ -73,13 +76,21 @@ export default function App() {
     const job = data.jobs.find((item) => item.id === selectedJobId); if (!job || job.status !== 'completed' || data.invoices.some((item) => item.jobId === job.id)) return
     setData((current) => ({ ...current, invoices: [...current.invoices, createInvoiceFromJob(job)] })); setView('money')
   }
-
   const markInvoicePaid = (invoiceId: string) => setData((current) => ({ ...current, invoices: current.invoices.map((item) => item.id === invoiceId ? { ...item, status: 'paid', paidAt: new Date().toISOString() } : item) }))
 
   const addPhoto = async (event: ChangeEvent<HTMLInputElement>, kind: JobPhotoKind) => {
     const file = event.target.files?.[0]; const job = data.jobs.find((item) => item.id === selectedJobId); if (!file || !job) return
     setPhotoBusy(true); try { const dataUrl = await compressPhoto(file); setData((current) => ({ ...current, jobPhotos: [...current.jobPhotos, { id: newId('photo'), jobId: job.id, propertyId: job.propertyId, kind, dataUrl, createdAt: new Date().toISOString() }] })) } finally { setPhotoBusy(false); event.target.value = '' }
   }
+
+  const exportBackup = () => { downloadText(`washflow-backup-${new Date().toISOString().slice(0, 10)}.json`, createBackup(data)); setDataNotice('Full backup downloaded.') }
+  const exportCustomers = () => { downloadText('washflow-customers.csv', customersCsv(data), 'text/csv'); setDataNotice('Customer CSV downloaded.') }
+  const exportInvoices = () => { downloadText('washflow-invoices.csv', invoicesCsv(data), 'text/csv'); setDataNotice('Invoice CSV downloaded.') }
+  const restoreBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]; if (!file) return
+    try { const restored = parseBackup(await file.text()); setData({ ...restored, serviceTemplates: restored.serviceTemplates.length ? restored.serviceTemplates : pressureWashingServices }); setDataNotice('Backup restored successfully.') } catch { setDataNotice('That file is not a valid WashFlow backup.') } finally { event.target.value = '' }
+  }
+  const loadDemo = () => { setData(createDemoData()); setDataNotice('Demo dataset loaded. Export your real backup first if needed.'); setView('home') }
 
   const customer = data.customers.find((item) => item.id === selectedCustomerId)
   const property = data.properties.find((item) => item.id === selectedPropertyId)
@@ -93,9 +104,11 @@ export default function App() {
   const selectedJobInvoice = selectedJob ? data.invoices.find((item) => item.jobId === selectedJob.id) : undefined
 
   return <div className="app">
-    <header className="topbar"><div><span className="eyebrow">Pressure washing CRM</span><h1>WashFlow</h1></div><span className="local-pill">Local-first</span></header>
+    <header className="topbar"><div><span className="eyebrow">Pressure washing CRM</span><h1>WashFlow</h1></div><button className="data-link" onClick={() => setView('data')}>Data</button></header>
 
     {view === 'home' && <main className="shell"><section className="hero-card"><span className="eyebrow">Today</span><h2>Quote to paid, without the clutter.</h2><p>Everything stays on this device. No required cloud or paid API.</p><button className="primary" onClick={() => setView('customer')}>+ New Lead</button></section><section className="metric-grid"><article><strong>{data.jobs.length}</strong><span>Jobs</span></article><article><strong>{attention.length}</strong><span>Needs attention</span></article><article><strong>${outstanding.toFixed(0)}</strong><span>Outstanding</span></article></section>{attention.length > 0 && <section className="panel attention-panel"><div className="section-heading"><h3>Needs attention</h3><span>{attention.length} items</span></div><div className="attention-list">{attention.map((item) => <article className={`attention-item ${item.severity}`} key={item.id}><div><strong>{item.title}</strong><small>{item.detail}</small></div><span>{item.kind}</span></article>)}</div></section>}<section className="panel"><div className="section-heading"><h3>Recent quotes</h3><span>{data.estimates.length ? 'Saved locally' : 'Ready for first lead'}</span></div>{!data.estimates.length ? <p className="muted">Create a lead and quote to begin.</p> : <div className="activity-list">{data.estimates.slice().reverse().map((estimate) => { const c = data.customers.find((item) => item.id === estimate.customerId); const p = data.properties.find((item) => item.id === estimate.propertyId); return <button className="activity activity-button" key={estimate.id} onClick={() => { setSelectedEstimateId(estimate.id); setView('estimateDetail') }}><div><strong>{c?.name}</strong><span>{p?.address}</span><small>{estimate.items.map((item) => item.name).join(' · ')}</small></div><div className="activity-right"><span className={`status ${estimate.status}`}>{estimate.status}</span><strong>${estimate.subtotal.toFixed(2)}</strong></div></button> })}</div>}</section>{latestEstimate && <section className="success-card"><strong>Local persistence active</strong><span>Latest quote: ${latestEstimate.subtotal.toFixed(2)}.</span></section>}</main>}
+
+    {view === 'customers' && <main className="shell"><section className="panel"><div className="section-heading"><h3>Customers</h3><span>{data.customers.length} total</span></div>{!data.customers.length ? <p className="muted">No customers yet.</p> : <div className="activity-list">{data.customers.slice().sort((a,b) => a.name.localeCompare(b.name)).map((item) => { const props = data.properties.filter((p) => p.customerId === item.id); const jobs = data.jobs.filter((j) => j.customerId === item.id); return <article className="activity" key={item.id}><div><strong>{item.name}</strong><span>{props.map((p) => p.address).join(' · ') || 'No property'}</span><small>{item.phone || item.email || 'No contact details'}</small></div><div className="activity-right"><strong>{jobs.length}</strong><small>jobs</small></div></article> })}</div>}</section></main>}
 
     {view === 'customer' && <main className="shell narrow"><Step title="1. Customer & property" subtitle="Start with the minimum needed to quote the job." onBack={() => setView('home')} /><form className="form-card" onSubmit={addCustomer}><label>Name<input name="name" required placeholder="John Smith" /></label><div className="two-col"><label>Phone<input name="phone" inputMode="tel" /></label><label>Email<input name="email" type="email" /></label></div><label>Property address<input name="address" required placeholder="123 Main Street" /></label><div className="address-grid"><label>City<input name="city" /></label><label>State<input name="state" maxLength={2} /></label><label>ZIP<input name="postalCode" inputMode="numeric" /></label></div><button className="primary full" type="submit">Continue to services</button></form></main>}
 
@@ -111,7 +124,9 @@ export default function App() {
 
     {view === 'money' && <main className="shell"><section className="metric-grid"><article><strong>${outstanding.toFixed(0)}</strong><span>Outstanding</span></article><article><strong>{data.invoices.filter((i) => i.status === 'unpaid').length}</strong><span>Unpaid</span></article><article><strong>{data.invoices.filter((i) => i.status === 'paid').length}</strong><span>Paid</span></article></section><section className="panel"><div className="section-heading"><h3>Invoices</h3><span>{data.invoices.length} total</span></div>{!data.invoices.length ? <p className="muted">Complete a job and generate an invoice.</p> : <div className="activity-list">{data.invoices.slice().reverse().map((invoice) => { const c = data.customers.find((item) => item.id === invoice.customerId); return <article className="activity" key={invoice.id}><div><strong>{c?.name}</strong><span>Due {invoice.dueDate}</span><small>{invoice.items.map((item) => item.name).join(' · ')}</small></div><div className="activity-right"><span className={`status ${invoice.status}`}>{invoice.status}</span><strong>${invoice.total.toFixed(2)}</strong>{invoice.status === 'unpaid' && <button className="mini-action" onClick={() => markInvoicePaid(invoice.id)}>Mark paid</button>}</div></article> })}</div>}</section></main>}
 
-    <nav className="bottom-nav"><button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}>Home</button><button disabled>Customers</button><button onClick={() => setView('jobs')} className={view === 'jobs' || view === 'jobDetail' ? 'active' : ''}>Jobs</button><button onClick={() => setView('money')} className={view === 'money' ? 'active' : ''}>Money</button></nav>
+    {view === 'data' && <main className="shell narrow"><Step title="Data & demo" subtitle="Portable by design. Your core business records are not trapped in WashFlow." onBack={() => setView('home')} /><section className="form-card"><button className="primary full" onClick={exportBackup}>Download full backup</button><div className="two-col"><button className="secondary" onClick={exportCustomers}>Customers CSV</button><button className="secondary" onClick={exportInvoices}>Invoices CSV</button></div><label className="secondary upload data-upload">Restore backup<input type="file" accept="application/json,.json" onChange={(event) => void restoreBackup(event)} /></label><div className="data-warning"><strong>Demo mode</strong><span>Replaces current local data with sample pressure-washing records. Export a backup first if you have real data.</span><button className="secondary" onClick={loadDemo}>Load demo data</button></div>{dataNotice && <p className="data-notice">{dataNotice}</p>}</section></main>}
+
+    <nav className="bottom-nav"><button onClick={() => setView('home')} className={view === 'home' ? 'active' : ''}>Home</button><button onClick={() => setView('customers')} className={view === 'customers' ? 'active' : ''}>Customers</button><button onClick={() => setView('jobs')} className={view === 'jobs' || view === 'jobDetail' ? 'active' : ''}>Jobs</button><button onClick={() => setView('money')} className={view === 'money' ? 'active' : ''}>Money</button></nav>
   </div>
 }
 
