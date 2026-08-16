@@ -1,5 +1,6 @@
-const CACHE = 'washflow-shell-v1'
-const SHELL = ['/', '/index.html', '/manifest.webmanifest']
+const CACHE = 'washflow-shell-v2'
+const ROOT = self.registration.scope
+const SHELL = [ROOT, new URL('index.html', ROOT).href, new URL('manifest.webmanifest', ROOT).href]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)))
@@ -22,6 +23,6 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE).then((cache) => cache.put(event.request, copy))
         return response
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html')))
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match(ROOT)))
   )
 })
