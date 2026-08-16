@@ -12,6 +12,7 @@ const emptyData: ServiceCoreData = {
   estimates: [],
   jobs: [],
   jobPhotos: [],
+  invoices: [],
   serviceTemplates: []
 }
 
@@ -23,6 +24,7 @@ function normalizeData(value?: Partial<ServiceCoreData>): ServiceCoreData {
     estimates: value?.estimates ?? [],
     jobs: value?.jobs ?? [],
     jobPhotos: value?.jobPhotos ?? [],
+    invoices: value?.invoices ?? [],
     serviceTemplates: value?.serviceTemplates ?? []
   }
 }
