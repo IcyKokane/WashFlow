@@ -57,6 +57,16 @@ export interface Estimate {
 }
 
 export type JobStatus = 'unscheduled' | 'scheduled' | 'in_progress' | 'completed'
+export type JobPhotoKind = 'before' | 'after'
+
+export interface JobPhoto {
+  id: Id
+  jobId: Id
+  propertyId: Id
+  kind: JobPhotoKind
+  dataUrl: string
+  createdAt: string
+}
 
 export interface Job {
   id: Id
@@ -67,6 +77,9 @@ export interface Job {
   quotedTotal: number
   status: JobStatus
   scheduledFor?: string
+  startedAt?: string
+  completedAt?: string
+  notes?: string
   createdAt: string
 }
 
@@ -83,5 +96,6 @@ export interface ServiceCoreData {
   leads: Lead[]
   estimates: Estimate[]
   jobs: Job[]
+  jobPhotos: JobPhoto[]
   serviceTemplates: ServiceTemplate[]
 }
