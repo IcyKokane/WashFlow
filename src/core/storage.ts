@@ -10,7 +10,19 @@ const emptyData: ServiceCoreData = {
   properties: [],
   leads: [],
   estimates: [],
+  jobs: [],
   serviceTemplates: []
+}
+
+function normalizeData(value?: Partial<ServiceCoreData>): ServiceCoreData {
+  return {
+    customers: value?.customers ?? [],
+    properties: value?.properties ?? [],
+    leads: value?.leads ?? [],
+    estimates: value?.estimates ?? [],
+    jobs: value?.jobs ?? [],
+    serviceTemplates: value?.serviceTemplates ?? []
+  }
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -30,7 +42,7 @@ export async function loadData(): Promise<ServiceCoreData> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly')
     const request = tx.objectStore(STORE).get(KEY)
-    request.onsuccess = () => resolve(request.result ?? structuredClone(emptyData))
+    request.onsuccess = () => resolve(request.result ? normalizeData(request.result) : structuredClone(emptyData))
     request.onerror = () => reject(request.error)
   })
 }
